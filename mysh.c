@@ -79,6 +79,8 @@ void process_input(char* input)
             int exit_status = WEXITSTATUS(status);
             if (exit_status != 0) {
                 printf("Error: Command exited with status %d\n", exit_status);
+                printf("!mysh >");
+                return;
             }
         }
         waitpid(pid2, &status, 0);
@@ -86,12 +88,38 @@ void process_input(char* input)
             int exit_status = WEXITSTATUS(status);
             if (exit_status != 0) {
                 printf("Error: Command exited with status %d\n", exit_status);
+                printf("!mysh >");
+                fflush(stdout);
+                return;
             }
         }
     } else if (strcmp(args[0], "cd") == 0) {
+        if(args[1] == NULL) {
+            chdir(getenv("HOME"));
+        }
+        else if(chdir(args[1]) != 0) {
+            printf("Error: No such directory\n");
+        } else {
+            char cwd[1024];
+            if (getcwd(cwd, sizeof(cwd)) != NULL) {
+                printf("%s", cwd);
+                printf("$ exit\n");
+                printf("mysh: exiting");
+                printf("\n$");
+                fflush(stdout);
+            }
+            else {
+                perror("getcwd() error");
+            }
+            exit(0);
+        }
         if (arg_count > 1) {
+            char* cd_cmd = malloc(strlen(args[1]) + 4);
+            sprintf(cd_cmd, "cd %s", args[1]);
+            system(cd_cmd);
+             free(cd_cmd);
             if (chdir(args[1]) != 0) {
-                printf("Error: Could not change directory\n");
+                printf("cd: No such file or directory\n");
             }
         } else {
             printf("Error: Missing argument for cd command\n");
@@ -121,7 +149,17 @@ void process_input(char* input)
         }
 
         closedir(dir);
-    } else {
+    } else if (chdir("../..") == 0) {
+        char cwd[1024];
+        if(getcwd(cwd, sizeof(MAX_CMD_LEN)) != NULL) {
+            printf("Current working directory: %s\n", cwd);
+        } else {
+            printf("Error: Failed to change directory.\n");
+        }
+     
+        
+    
+    }    else {
         pid_t pid = fork();
         if (pid == -1) {
             printf("Error: Could not fork process\n");
@@ -131,7 +169,10 @@ void process_input(char* input)
             execvp(args[0], args);
             printf("Error: Command not found\n");
             exit(1);
-        } else {
+        } else if (pid <0) {
+            perror("Error");
+        }
+        else {
             // Parent process
             int status;
             waitpid(pid, &status, 0);
@@ -139,18 +180,25 @@ void process_input(char* input)
                 int exit_status = WEXITSTATUS(status);
                 if (exit_status != 0) {
                     printf("Error: Command exited with status %d\n", exit_status);
+                    printf("!mysh >");
+                    fflush(stdout);
+                    return;
                 }
             }
         }
+        printf("!");
     }
+            printf("!");
+
 }
 
 void interactive_mode() {
+    printf("Welcome to my shell in Interactive Mode!\n");
     char cmd[MAX_CMD_LEN];
     char cwd[MAX_CMD_LEN];
     while (1) {
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
-            printf(COLOR_CYAN "%s" COLOR_RESET "$ ", cwd);
+            printf(COLOR_CYAN "mysh> " COLOR_RESET);    
         } else {
             printf(COLOR_CYAN "Unknown" COLOR_RESET "$ ");
         }
@@ -159,11 +207,16 @@ void interactive_mode() {
             break;
         }
         cmd[strcspn(cmd, "\n")] = '\0'; 
+        if (strcmp(cmd, "exit") == 0) {
+            printf("Exiting my shell\n");
+            break;
+        }
         process_input(cmd);
     }
 }
 
 void batch_mode(char* filename) {
+    printf("Welcome to my shell in Batch Mode!\n");
     FILE* file = fopen(filename, "r");
     if(file == NULL) {
         printf("Error: Unable to open file %s\n", filename);
