@@ -232,6 +232,40 @@ void batch_mode(char* filename) {
 }    
 
 int main(int argc, char* argv[]) {
+    ////////////
+    char *home = getenv("HOME");
+    if (home == NULL) {
+        fprintf(stderr, "Error: HOME environment variable not set\n");
+        exit(1);
+    }
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd))==NULL) {
+        perror("getcwd() error");
+        exit(1);
+    }
+    printf("Current working directory: %s\n", cwd);
+
+    if(argc == 1 || (argc == 2 && strncmp(argv[1], "~/", 2) == 0)) {
+        char *target_dir = (argc == 1) ? home : strcat(home, argv[1] + 1);
+        if(chdir(target_dir) == -1) {
+            perror("chdir() error");
+            exit(1);
+        }
+        printf("Changed working directory to: %s\n", target_dir);
+    } else {
+        if (chdir(argv[1]) == -1) {
+            perror("chdir() error");
+            exit(1);
+        }
+        printf("Changed working directory to: %s\n", argv[1]);
+    }
+
+    if(getcwd(cwd, sizeof(cwd)) == NULL) {
+        perror("getcwd() error");
+        exit(1);
+    }
+    printf("New working directory: %s\n", cwd);
+    //////////
     
     if(argc == 1) {
         interactive_mode();
