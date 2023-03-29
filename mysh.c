@@ -93,6 +93,14 @@ void process_input(char* input)
                 return;
             }
         }
+// pwd
+    } else if (strcmp(args[0], "pwd") == 0){
+        char wd[1000];
+        printf(" %s ", getcwd(wd, sizeof(wd)));
+        exit(0);
+    } else if (strcmp(args[0], "/" == 0){
+        
+    }
     } else if (strcmp(args[0], "cd") == 0) {
         if(args[1] == NULL) {
             chdir(getenv("HOME"));
