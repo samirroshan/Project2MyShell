@@ -8,7 +8,6 @@
 #include <sys/stat.h>  // for file permissions
 #include <sys/types.h> // for data types
 #include <unistd.h>  // for read/write/close functions
-
 #define MAX_CMD_LEN 1024
 #define COLOR_CYAN "\033[36m"
 #define COLOR_GREEN "\033[32m"
@@ -93,14 +92,6 @@ void process_input(char* input)
                 return;
             }
         }
-// pwd
-    } else if (strcmp(args[0], "pwd") == 0){
-        char wd[1000];
-        printf(" %s ", getcwd(wd, sizeof(wd)));
-        exit(0);
-    } else if (strcmp(args[0], "/" == 0){
-        
-    }
     } else if (strcmp(args[0], "cd") == 0) {
         if(args[1] == NULL) {
             chdir(getenv("HOME"));
@@ -238,9 +229,29 @@ void batch_mode(char* filename) {
     }
     fclose(file);
 }    
+///////
+int run(char* args[], int input, int output) {
+    pid_t p = fork();
+    if (p == -1) {
+        perror("fork");
+        return -1;
+    }
+    else if (p == 0) {
+        if (input != STDIN_FILENO) {
+            dup2(input, STDIN_FILENO);
+            close(input);
+        }
 
+        if (output != STDOUT_FILENO) {
+            dup2(output, STDOUT_FILENO);
+            close(output);
+        }
+
+
+    }
+}
+///////
 int main(int argc, char* argv[]) {
-    ////////////
     char *home = getenv("HOME");
     if (home == NULL) {
         fprintf(stderr, "Error: HOME environment variable not set\n");
@@ -273,7 +284,6 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
     printf("New working directory: %s\n", cwd);
-    //////////
     
     if(argc == 1) {
         interactive_mode();
