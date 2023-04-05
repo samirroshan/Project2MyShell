@@ -13,6 +13,133 @@
 #define COLOR_GREEN "\033[32m"
 #define COLOR_RESET "\033[0m"
 
+static void wildcard(cmd_t *cmd, char *path) {
+    char *asterisk = strchr(path, '*');
+    if (asterisk == NULL) {
+        array_add(cmd->args, copy_string(path));
+        return;
+    }
+
+    char *old_path = copy_string(path);
+    *asterisk = '\0';
+
+    char *prefix = path;
+    char *base = strrchr(path, '/');
+    if (base == NULL) {
+        base = ".";
+    } else {
+        *base = '\0';
+        prefix = base + 1;
+        base = path;
+    }
+
+    int prefix_len = strlen(prefix);
+    char *suffix = asterisk + 1;
+    int suffix_len = strlen(suffix);
+    /* printf("base: %s, prefix: %s, suffix: %s\n", base, prefix, suffix); */
+
+    DIR *dir = opendir(base);
+    struct dirent *entry;
+    int count = 0;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 ||
+            strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        int name_len = strlen(entry->d_name);
+        if (prefix_len + suffix_len <= name_len &&
+            strncmp(entry->d_name, prefix, prefix_len) == 0 &&
+            strcmp(entry->d_name + name_len - suffix_len, suffix) == 0) {
+            char *new_path = malloc(strlen(base) + 1 + name_len + 1);
+            if (strcmp(base, ".") == 0) {
+                sprintf(new_path, "%s", entry->d_name);
+            } else {
+                sprintf(new_path, "%s/%s", base, entry->d_name);
+            }
+            count++;
+            /* printf("new_path: %s\n", new_path); */
+            array_add(cmd->args, new_path);
+        }
+    }
+    if (count == 0) {
+        array_add(cmd->args, old_path);
+    } else {
+        free(old_path);
+    }
+    closedir(dir);
+}
+
+static bool cmd_parse(char *line, cmd_t *cmd) {
+    char *token = NULL;
+    while ((token = next_token(&line, DELIM)) != NULL) {
+        if (strcmp(token, "<") == 0) {
+            if (cmd->in != NULL) {
+                return false;
+            }
+            char *next = next_token(&line, DELIM);
+            if (next == NULL) {
+                return false;
+            }
+            cmd->in = copy_string(next);
+        } else if (strcmp(token, ">") == 0) {
+            if (cmd->out != NULL) {
+                return false;
+            }
+            char *next = next_token(&line, DELIM);
+            if (next == NULL) {
+                return false;
+            }
+            cmd->out = copy_string(next);
+        } else {
+            if (token[0] == '~') {
+                token = extension_home_dir(token);
+                wildcard(cmd, token);
+                free(token);
+            } else {
+                wildcard(cmd, token);
+            }
+        }
+    }
+
+    if (array_size(cmd->args) == 0) {
+        return false;
+    }
+
+    array_add(cmd->args, NULL);
+    return true;
+}
+
+pipeline_t *pipeline_parse(char *line) {
+    pipeline_t *pipeline = malloc(sizeof(pipeline_t));
+    pipeline->cmds = array_new(5);
+
+    char *token = NULL;
+    while ((token = next_token(&line, "|")) != NULL) {
+        cmd_t *cmd = cmd_new();
+        if (!cmd_parse(token, cmd)) {
+            cmd_free(cmd);
+            pipeline_free(pipeline);
+            return NULL;
+        }
+        array_add(pipeline->cmds, cmd);
+    }
+
+    for (int i = 0; i < array_size(pipeline->cmds); i++) {
+        cmd_t *cmd = array_get(pipeline->cmds, i);
+        if (cmd->in != NULL && i != 0) { // only the first command can have input
+            pipeline_free(pipeline);
+            return NULL;
+        }
+        if (cmd->out != NULL && i != array_size(pipeline->cmds) - 1) { // only the last command can have output
+            pipeline_free(pipeline);
+            return NULL;
+        }
+    }
+
+    return pipeline;
+}
+
 void process_input(char* input) 
 {
     char* args[MAX_CMD_LEN];
